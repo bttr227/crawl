@@ -256,6 +256,7 @@ viewchar.o \
 viewgeom.o \
 viewmap.o \
 wcwidth.o \
+weapon-menu.o \
 wiz-dgn.o \
 wiz-dump.o \
 wiz-fsim.o \
