@@ -240,7 +240,17 @@ string overview_description_string(bool display)
     disp += _get_altars(display);
     disp += _get_shops(display);
     disp += _get_portals();
-    disp += _get_notes(display);
+    disp += _get_notes(display) + "\n";
+    
+    //Add a Key (BTT)
+    disp +="<white>Key</white>\n";
+    disp += "<lightgray>+ : Good   - : Evil   = : Neutral   & : Chaotic   @ : Evil and Chaotic</lightgray>\n";
+    disp += "<green>God doesn't like your god</green>   <blue>Unaccessible for Player</blue>   <brown>God likes your god</brown>\n";
+    disp += "<darkgray>Hasn't been seen</darkgray>   <white>Has been seen</white>   <red>Penance with god</red>   <magenta>Abandoned</magenta>   <yellow>You Worship</yellow>\n\n";
+
+    //Add command line (BTT)
+    disp += "<white>Command Line</white>\n";
+    disp += "<lightgray>Enter a command: </lightgray>\n";
 
     return disp.substr(0, disp.find_last_not_of('\n')+1);
 }
@@ -459,7 +469,7 @@ static string _print_altars_for_gods(const vector<god_type>& gods,
     char const *colour;
     const int columns = 4;
     vector<string> good_god = {"elyvilon", "zin", "the shining one"};
-    vector<string> neut_god = {"ashenzari", "cheibriados", "dithmenos", "fedhas madash", "gozag ym sagoz",
+    vector<string> neut_god = {"ashenzari", "cheibriados", "dithmenos", "fedhas", "gozag",
                             "hepliaklqana", "ignis", "okawaru", "qazlal", "ru", "sif muna", "trog", "uskayaw",
                             "vehumet", "wu jian"};
     vector<string> chaotic_god = {"jiyva", "nemelex xobeh", "xom"};
@@ -490,9 +500,12 @@ static string _print_altars_for_gods(const vector<god_type>& gods,
             continue;
         }
 
+        //Determine the color based on the altar's state
+        if (!has_altar_been_seen)
         colour = "darkgrey";
         if (has_altar_been_seen)
             colour = "white";
+
         // Good gods don't inflict penance unless they hate your god.
         if (player_under_penance(god)
             && (xp_penance(god) || active_penance(god)))
@@ -506,7 +519,12 @@ static string _print_altars_for_gods(const vector<god_type>& gods,
             colour = "yellow";
         else if (god_likes_your_god(god) && has_altar_been_seen)
             colour = "brown";
-
+        //If god doesn't like your god, then display as pink (BTT)
+        else if (!god_likes_your_god(god) && has_altar_been_seen)
+            colour = "green";
+        //If god doesn't like the player (BTT)
+        else if (!player_can_join_god(god, false))
+            colour = "blue";
         if (!print_unseen && !strcmp(colour, "darkgrey"))
             continue;
 
@@ -529,6 +547,7 @@ static string _print_altars_for_gods(const vector<god_type>& gods,
          else if (find(chaot_evil.begin(), chaot_evil.end(), god_lower) != chaot_evil.end())
             symbol = "@";
 
+        disp_name = uppercase_first(god_name(god, false));
         disp_name += " " + symbol;
         
         if (god == GOD_GOZAG && !you_worship(GOD_GOZAG))
@@ -728,12 +747,36 @@ protected:
     }
 };
 
+//handle the command line logic (BTT)
+// void overview_command_line(const string& input)
+// {
+//     while (true){
+//         if (input == "q" || input == "quit")
+//             break;  // Exits the command mode.
+//         else if (input == "?"){
+//             mpr("<white>Religion Command Help</white>");
+//             mpr("<lightgray>?         - Show this help menu</lightgray>");
+//             mpr("<lightgray>godlist   - Show all gods and their alignments</lightgray>");
+//             mpr("<lightgray>altarinfo - Display known altar locations</lightgray>");
+//             mpr("<lightgray>wrathinfo - Explain godly wrath mechanics</lightgray>");
+//             mpr("<lightgray>q         - Exit command mode</lightgray>");
+//         }
+//         else
+//         break;
+        
+//     }
+// }
+
 void display_overview()
 {
     string disp = overview_description_string(true);
     linebreak_string(disp, 80);
     dgn_overview overview(disp);
     _process_command(overview.show());
+
+    // Trying to get command line into the display
+    //string input = get_string("<white>Enter a command (? for help, q to quit):</white> ");
+    //overview_command_line(input);
 }
 
 static void _process_command(const char keypress)
