@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Spell casting and miscast functions.
+ * @brief Weapon menu and weapon functions.
 **/
 
 #include "AppHdr.h"
@@ -143,6 +143,33 @@ protected:
             describe_item(you.inv[static_cast<WeaponMenuEntry*>(items[i])->index]);
         return true;
     }
+
+    bool process_key(int key) override
+    {
+        // Check if this key matches any entry’s hotkeys
+        for (MenuEntry* entry : items)
+        {
+            for (int hotkey : entry->hotkeys)
+            {
+                if (hotkey == key)
+                    return ToggleableMenu::process_key(key); // Let the menu handle it
+            }
+        }
+    
+        // Handle other keys (add actions for non-hotkey keys)
+        switch (key)
+        {
+            case 27:  // Example for quit or exit
+                // Your quit action code here
+                return false;
+    
+            // Add other key actions as needed
+            default:
+                // Handle unknown keys if necessary
+                return true;  // or true based on how you want to treat unrecognized keys
+        }
+    }
+    
 };
 
 
@@ -185,9 +212,6 @@ static string _weapon_extra_description(const item_def &weapon, bool viewing)
 int list_weapons(bool toggle_with_I, bool viewing, bool allow_preselect,
     const string &action)
 {
-    if (toggle_with_I && get_spell_by_letter('I') != SPELL_NO_SPELL)
-    toggle_with_I = false;
-
     const string real_action = viewing ? "describe" : action;
 
     WeaponMenu weapon_menu;
@@ -256,10 +280,15 @@ int list_weapons(bool toggle_with_I, bool viewing, bool allow_preselect,
     int choice = 0;
     weapon_menu.on_single_selection = [&choice](const MenuEntry& item)
     {
-        ASSERT(item.hotkeys.size() == 1);
-    choice = item.hotkeys[0];
-    return false;
+        if (item.hotkeys.empty())
+        {
+            return false; // Do nothing for entries with no hotkey.
+        }
+        choice = item.hotkeys[0];
+        return false;
+
     };
+    
 
     weapon_menu.show();
     if (!crawl_state.doing_prev_cmd_again)
