@@ -240,7 +240,16 @@ string overview_description_string(bool display)
     disp += _get_altars(display);
     disp += _get_shops(display);
     disp += _get_portals();
-    disp += _get_notes(display);
+    disp += _get_notes(display) + "\n";
+    
+    //Add a Key (BTT)
+    disp +="<white>Key</white>\n";
+    disp += "<lightgray>+ : Good   - : Evil   = : Neutral   & : Chaotic   @ : Evil and Chaotic</lightgray>\n";
+    disp += "<green>God doesn't like your god</green>   <blue>Unaccessible for Player</blue>   <brown>God likes your god</brown>\n";
+    disp += "<darkgray>Hasn't been seen</darkgray>   <white>Has been seen</white>   <red>Penance with god</red>   <magenta>Abandoned</magenta>   <yellow>You Worship</yellow>\n\n";
+
+    //Add command line (BTT)
+    disp += "<white>Command Line: (press ? to prompt)</white>\n";
 
     return disp.substr(0, disp.find_last_not_of('\n')+1);
 }
@@ -458,6 +467,13 @@ static string _print_altars_for_gods(const vector<god_type>& gods,
     int num_printed = 0;
     char const *colour;
     const int columns = 4;
+    vector<string> good_god = {"elyvilon", "zin", "the shining one"};
+    vector<string> neut_god = {"ashenzari", "cheibriados", "dithmenos", "fedhas", "gozag",
+                            "hepliaklqana", "ignis", "okawaru", "qazlal", "ru", "sif muna", "trog", "uskayaw",
+                            "vehumet", "wu jian"};
+    vector<string> chaotic_god = {"jiyva", "nemelex xobeh", "xom"};
+    vector<string> evil_god = {"beogh", "kikubaaqudgha", "yredelemnul"};
+    vector<string> chaot_evil = { "lugonu", "makhleb"};
 
     for (const god_type god : gods)
     {
@@ -483,9 +499,12 @@ static string _print_altars_for_gods(const vector<god_type>& gods,
             continue;
         }
 
+        //Determine the color based on the altar's state
+        if (!has_altar_been_seen)
         colour = "darkgrey";
         if (has_altar_been_seen)
             colour = "white";
+
         // Good gods don't inflict penance unless they hate your god.
         if (player_under_penance(god)
             && (xp_penance(god) || active_penance(god)))
@@ -499,7 +518,12 @@ static string _print_altars_for_gods(const vector<god_type>& gods,
             colour = "yellow";
         else if (god_likes_your_god(god) && has_altar_been_seen)
             colour = "brown";
-
+        //If god doesn't like your god, then display as pink (BTT)
+        else if (!god_likes_your_god(god) && has_altar_been_seen)
+            colour = "green";
+        //If god doesn't like the player (BTT)
+        else if (!player_can_join_god(god, false))
+            colour = "blue";
         if (!print_unseen && !strcmp(colour, "darkgrey"))
             continue;
 
@@ -507,6 +531,24 @@ static string _print_altars_for_gods(const vector<god_type>& gods,
             colour = "darkgrey";
 
         string disp_name = uppercase_first(god_name(god, false));
+        
+        //Alignment symbol (BTT)
+        string god_lower = lowercase(disp_name);
+        string symbol = "";
+        if (find(good_god.begin(), good_god.end(), god_lower) != good_god.end())
+            symbol = "+";
+        else if (find(neut_god.begin(), neut_god.end(), god_lower) != neut_god.end())
+            symbol = "=";
+        else if (find(chaotic_god.begin(), chaotic_god.end(), god_lower) != chaotic_god.end())
+            symbol = "&";
+        else if (find(evil_god.begin(), evil_god.end(), god_lower) != evil_god.end())
+            symbol = "-";
+         else if (find(chaot_evil.begin(), chaot_evil.end(), god_lower) != chaot_evil.end())
+            symbol = "@";
+
+        disp_name = uppercase_first(god_name(god, false));
+        disp_name += " " + symbol;
+        
         if (god == GOD_GOZAG && !you_worship(GOD_GOZAG))
             disp_name += make_stringf(" ($%d)", gozag_service_fee());
 
@@ -697,7 +739,7 @@ protected:
     {
         // We handle these after exiting dungeon overview window
         // to prevent menus from stacking on top of each other.
-        if (ch == 'G' || ch == '_' || ch == '$' || ch =='!')
+        if (ch == 'G' || ch == '_' || ch == '$' || ch =='!' || ch == '?')
             return false;
         else
             return formatted_scroller::process_key(ch);
@@ -710,10 +752,35 @@ void display_overview()
     linebreak_string(disp, 80);
     dgn_overview overview(disp);
     _process_command(overview.show());
+
 }
+
+static string get_line_input()
+{
+    string input;
+    while (true)
+    {
+        int ch = get_ch();
+        if (ch == '\n' || ch == '\r' || ch == CK_ENTER)
+            break;
+        if (ch == 27) // ESC key
+            break;
+        if (ch >= 32 && ch <= 126) // printable characters
+        {
+            input += static_cast<char>(ch);
+            // Optionally echo the char back: putch(ch);
+        }
+    }
+    return input;
+}
+
 
 static void _process_command(const char keypress)
 {
+    vector<string> allgods = {"elyvilon", "zin", "the shining one","ashenzari", "cheibriados", "dithmenos", "fedhas", "gozag",
+        "hepliaklqana", "ignis", "okawaru", "qazlal", "ru", "sif muna", "trog", "uskayaw","vehumet", "wu jian","jiyva", 
+        "nemelex xobeh", "xom","beogh", "kikubaaqudgha", "yredelemnul","lugonu", "makhleb"};
+
     switch (keypress)
     {
         case 'G':
@@ -738,6 +805,88 @@ static void _process_command(const char keypress)
         case '!':
             do_annotate();
             return;
+        case '?':
+            mpr("Help Line (? - help, L - List of Gods, P - print religion info, q - quit)");
+            flush_prev_message();
+            while (true)
+            {
+                int keyin = get_ch();
+                flush_prev_message();
+        
+                switch (keyin)
+                {
+                case 'P':
+                {
+                    mpr("Input a number from 0–25 to see the religion info of the respective god: (press enter after input)");
+                    flush_prev_message();
+                
+                    string input = get_line_input();
+                    int god_index = atoi(input.c_str());
+                
+                    const char* god_info[] = {
+                        "0 - Elyvilon: God of healing and peace.",
+                        "1 - Zin: God of order, law, and purity.",
+                        "2 - The Shining One: God of holy war.",
+                        "3 - Ashenzari: God of curses and binding.",
+                        "4 - Cheibriados: God of slowness and contemplation.",
+                        "5 - Dithmenos: God of shadow and stealth.",
+                        "6 - Fedhas: God of plants and growth.",
+                        "7 - Gozag: God of commerce and wealth.",
+                        "8 - Hepliaklqana: God of ancestors.",
+                        "9 - Ignis: God of fire and desperation.",
+                        "10 - Okawaru: God of battle and honor.",
+                        "11 - Qazlal: God of storms and destruction.",
+                        "12 - Ru: God of sacrifice and power.",
+                        "13 - Sif Muna: God of magical knowledge.",
+                        "14 - Trog: God of berserk rage.",
+                        "15 - Uskayaw: God of pain and movement.",
+                        "16 - Vehumet: God of destructive magic.",
+                        "17 - Wu Jian: God of martial arts.",
+                        "18 - Jiyva: God of slimes and mutation.",
+                        "19 - Nemelex Xobeh: God of chance and cards.",
+                        "20 - Xom: God of chaos and randomness.",
+                        "21 - Beogh: Orc god of conquest.",
+                        "22 - Kikubaaqudgha: God of death and necromancy.",
+                        "23 - Yredelemnul: God of undeath.",
+                        "24 - Lugonu: God of corruption and the abyss.",
+                        "25 - Makhleb: God of violence and demons."
+                    };
+                
+                    if (god_index >= 0 && god_index < 26)
+                        mpr(god_info[god_index]);
+                    else
+                        mpr("Invalid number. Please enter 0–25.");
+                
+                    flush_prev_message();
+                    break;
+                }
+                case 'L':
+                    {
+                        mpr("List of Gods:");
+                        mpr("Good Gods: elyvilon, zin, the shining one");
+                        mpr("Neutral Gods: ashenzari, cheibriados, dithmenos, fedhas, gozag, hepliaklqana, ignis, \nokawaru, qazlal, ru, sif muna, trog, uskayaw, vehumet, wu jian");
+                        mpr("Chaotic Gods: jiyva, nemelex xobeh, xom");
+                        mpr("Evil Gods: beogh, kikubaaqudgha, yredelemnul");
+                        mpr("Chaotic Evil Gods: lugonu, makhleb");
+                        mpr("Good = 0-2, Neutral = 3-17, Chaotic = 18-20, Evil = 21-23, Chaotic Evil = 24-25");
+                        flush_prev_message();
+                    }
+                    break;
+                case '?':
+                    mpr("Available commands:\n  L - List of Gods\n  P - Religion Info\n  q - Quit help");
+                    flush_prev_message();
+                    break;
+                case 'q':
+                    mpr("Exiting help.");
+                    flush_prev_message();
+                    return;
+                default:
+                    mpr("Unrecognized command. Press ? for help, q to quit.");
+                    flush_prev_message();
+                    break;
+                }
+            }
+            return;            
         default:
             return;
     }
